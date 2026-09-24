@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DOC_TYPES, friendlyError } from "@/lib/crm";
 import { formatBytes, formatDateTime } from "@/lib/br";
+import { useSession } from "@/hooks/use-session";
 
 export function useDocuments(filter: { clientId?: string | undefined; processId?: string | undefined } = {}) {
   return useQuery({
@@ -39,6 +40,7 @@ export function useDocuments(filter: { clientId?: string | undefined; processId?
 
 export function DocumentsPanel({ clientId, processId }: { clientId: string; processId?: string }) {
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
   const inputRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState("Outros");
   const [pendingDelete, setPendingDelete] = useState<{ id: string; storage_path: string } | null>(null);
@@ -74,9 +76,12 @@ export function DocumentsPanel({ clientId, processId }: { clientId: string; proc
 
   const remove = useMutation({
     mutationFn: async (doc: { id: string; storage_path: string }) => {
-      await supabase.storage.from("documents").remove([doc.storage_path]);
-      const { error } = await supabase.from("documents").delete().eq("id", doc.id);
+      const { error: storageError } = await supabase.storage.from("documents").remove([doc.storage_path]);
+      if (storageError) throw storageError;
+
+      const { data: deleted, error } = await supabase.from("documents").delete().eq("id", doc.id).select("id");
       if (error) throw error;
+      if (!deleted?.length) throw new Error("Você não tem permissão para excluir este documento.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
@@ -131,7 +136,10 @@ export function DocumentsPanel({ clientId, processId }: { clientId: string; proc
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {documents.map((d) => (
+        {documents.map((d) => {
+          const canDelete = session?.isAdmin || d.uploaded_by === session?.userId;
+
+          return (
           <div key={d.id} className="flex items-start gap-3 rounded-xl border bg-card p-4">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileText className="h-4 w-4" />
@@ -146,17 +154,20 @@ export function DocumentsPanel({ clientId, processId }: { clientId: string; proc
               <Button size="icon" variant="ghost" onClick={() => openDoc(d.storage_path)} aria-label="Abrir">
                 <Download className="h-4 w-4" />
               </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setPendingDelete({ id: d.id, storage_path: d.storage_path })}
-                aria-label="Excluir"
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
+              {canDelete && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setPendingDelete({ id: d.id, storage_path: d.storage_path })}
+                  aria-label="Excluir"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
