@@ -1,6 +1,9 @@
 # CRM Garantia e Proteção
 
-CRM interno da Garantia e Proteção Consultoria e Corretora de Seguros LTDA, focado na gestão comercial de planos de saúde.
+CRM interno da Garantia e Proteção Consultoria e Corretora de Seguros LTDA, focado na gestão comercial de planos de saúde.<br>
+
+<img width="1897" height="858" alt="image" src="https://github.com/user-attachments/assets/c41f6c9b-1351-48a6-b78f-c1bde29b379b" />
+
 
 ## Acesso
 
